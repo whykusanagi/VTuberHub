@@ -1,6 +1,6 @@
 # iFacialMocap UDP Relay
 
-A lightweight Go-based UDP relay that receives ARKit-style facial tracking data from the iFacialMocap iOS app and forwards it simultaneously to multiple destinations (VTube Studio, Warudo, etc.) without introducing measurable latency.
+A lightweight Go-based UDP relay that receives ARKit-style facial tracking data from the iFacialMocap iOS app and forwards it simultaneously to multiple destinations (VBridger for VTube Studio, Warudo, etc.) without introducing measurable latency.
 
 ## Overview
 
@@ -16,18 +16,21 @@ graph TB
     
     subgraph "PC/Laptop"
         B[UDP Relay<br/>Port 50000]
-        C[VTube Studio<br/>Port 49983]
-        D[Warudo<br/>Port 39539]
+        C[VBridger<br/>Port 49983]
+        D[VTube Studio]
+        E[Warudo<br/>Port 39539]
     end
     
     A -->|UDP Packets<br/>ARKit Blendshapes| B
     B -->|Identical Copy| C
-    B -->|Identical Copy| D
+    C -->|Forwarded| D
+    B -->|Identical Copy| E
     
     style A fill:#4A90E2
     style B fill:#50C878
-    style C fill:#FF6B6B
+    style C fill:#FFB347
     style D fill:#FF6B6B
+    style E fill:#FF6B6B
 ```
 
 ## Traffic Flow
@@ -36,6 +39,7 @@ graph TB
 sequenceDiagram
     participant iOS as iFacialMocap iOS
     participant Relay as UDP Relay
+    participant VB as VBridger
     participant VTS as VTube Studio
     participant Warudo as Warudo
     
@@ -46,9 +50,11 @@ sequenceDiagram
         Note over Relay: Packet Size: ~956-965 bytes
         
         par Parallel Forwarding
-            Relay->>VTS: Identical Copy
+            Relay->>VB: Identical Copy
             Relay->>Warudo: Identical Copy
         end
+        
+        VB->>VTS: Forwarded Data
         
         Relay->>Relay: Update Statistics
     end
@@ -126,7 +132,7 @@ Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directo
    {
      "listen_port": 50000,
      "targets": [
-       {"host": "127.0.0.1", "port": 49983, "name": "VTubeStudio"},
+       {"host": "127.0.0.1", "port": 49983, "name": "VBridger"},
        {"host": "127.0.0.1", "port": 39539, "name": "Warudo"}
      ],
      "buffer_size": 4096,
@@ -148,7 +154,7 @@ Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directo
 
 4. **Verify**
    
-   Both VTube Studio and Warudo should receive tracking data simultaneously.
+   VBridger (which forwards to VTube Studio) and Warudo should receive tracking data simultaneously.
 
 ## Verification
 
@@ -156,7 +162,7 @@ When started correctly, you should see:
 
 ```
 [INFO] Listening on :50000
-[INFO] Forwarding to 127.0.0.1:49983 (VTubeStudio)
+[INFO] Forwarding to 127.0.0.1:49983 (VBridger)
 [INFO] Forwarding to 127.0.0.1:39539 (Warudo)
 [INFO] Relay started successfully
 ```
@@ -201,9 +207,9 @@ Each target requires:
 **Cause**: One target port is incorrect
 
 **Fix**:
-- Verify Warudo/VTS ports in `relay_config.json` match actual ports
-- Check if apps are listening on expected ports
-- Use `netstat -an | findstr :49983` to verify ports
+- Verify VBridger/Warudo ports in `relay_config.json` match actual ports
+- Check if VBridger and Warudo are listening on expected ports
+- Use `netstat -an | findstr :49983` to verify VBridger port
 
 ### Symptom: Intermittent lag
 
@@ -325,7 +331,8 @@ for i in {1..10000}; do echo $i | nc -u 127.0.0.1 50000; done
 ## Notes
 
 - The relay forwards packets exactly as received (no format conversion)
-- Both Warudo and VTube Studio support iFacialMocap's native ARKit format directly
+- VBridger forwards data to VTube Studio (VBridger acts as a bridge between the relay and VTube Studio)
+- Warudo receives data directly from the relay
 - Each target receives an identical copy of every packet
 - No packet transformation or protocol translation occurs
 
