@@ -201,18 +201,29 @@ Place the compiled binary (`ifmrelay.exe` on Windows, `ifmrelay` on macOS/Linux)
    
    **Note**: Port `13121` is a custom port chosen to avoid conflicts with common software. It maps to Celeste themes/motifs and should not interfere with well-known services.
 
-2. **Start the Relay**
+2. **Configure VBridger**
+   
+   Before starting the relay, configure VBridger to listen on the loopback interface:
+   
+   1. Open VBridger
+   2. Set the IP address to `127.0.0.1` (loopback/localhost)
+   3. Set the port to `49983` (must match the port in `relay_config.json`)
+   4. **Click "Connect"** to start listening for incoming traffic
+   
+   **Important**: Using `127.0.0.1` ensures VBridger only listens on the loopback interface, preventing external connections. This is a security best practice for local-only traffic.
+
+3. **Start the Relay**
    
    ```bash
    .\ifmrelay.exe -config relay_config.json
    ```
 
-3. **Configure iFacialMocap iOS App**
+4. **Configure iFacialMocap iOS App**
    - Set your PC's IP address
    - Set port to `13121` (or your configured `listen_port`)
    - **IMPORTANT**: After starting the relay, restart iFacialMocap to establish connection
 
-4. **Configure Windows Firewall** (Windows only)
+5. **Configure Windows Firewall** (Windows only)
    
    Windows Defender Firewall will likely block incoming UDP traffic. You need to allow the relay:
    
@@ -239,9 +250,11 @@ Place the compiled binary (`ifmrelay.exe` on Windows, `ifmrelay` on macOS/Linux)
    6. Check all profiles → Next
    7. Name it "iFacialMocap UDP Relay" → Finish
 
-5. **Verify**
+6. **Verify**
    
    VBridger (which forwards to VTube Studio) and Warudo should receive tracking data simultaneously.
+   
+   **Check VBridger**: Verify that VBridger shows it's receiving data and forwarding to VTube Studio. The connection status in VBridger should indicate active data flow.
 
 ## Verification
 
@@ -292,12 +305,19 @@ Each target requires:
 
 ### Symptom: Only one app updates
 
-**Cause**: One target port is incorrect
+**Cause**: One target port is incorrect, or VBridger is not properly configured
 
 **Fix**:
-- Verify VBridger/Warudo ports in `relay_config.json` match actual ports
-- Check if VBridger and Warudo are listening on expected ports
-- Use `netstat -an | findstr :49983` to verify VBridger port
+- **VBridger Configuration**:
+  - Ensure VBridger is set to `127.0.0.1` (not your network IP)
+  - Verify VBridger port is `49983` (must match `relay_config.json`)
+  - **Important**: VBridger must be connected (click "Connect" button) before starting the relay
+  - Check VBridger connection status indicator to confirm it's listening
+- **Port Verification**:
+  - Verify VBridger/Warudo ports in `relay_config.json` match actual ports
+  - Check if VBridger and Warudo are listening on expected ports
+  - Use `netstat -an | findstr :49983` to verify VBridger port
+  - Use `netstat -an | findstr :39539` to verify Warudo port
 
 ### Symptom: Intermittent lag
 
