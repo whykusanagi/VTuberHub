@@ -22,50 +22,9 @@ type Config struct {
 
 // Target represents a forwarding destination
 type Target struct {
-	Host   string `json:"host"`
-	Port   int    `json:"port"`
-	Name   string `json:"name"`
-	Format string `json:"format,omitempty"` // "raw" or "vsf", defaults to "raw"
-}
-
-// TargetInfo holds resolved address and format for a target
-type TargetInfo struct {
-	Addr   *net.UDPAddr
-	Format string
-	Name   string
-}
-
-// iFacialMocapMessage represents the incoming JSON structure from iFacialMocap
-type iFacialMocapMessage struct {
-	BlendShapes map[string]float64 `json:"blendShapes"`
-	Head        *struct {
-		X float64 `json:"x"`
-		Y float64 `json:"y"`
-		Z float64 `json:"z"`
-	} `json:"head,omitempty"`
-	Rotation *struct {
-		X float64 `json:"x"` // pitch
-		Y float64 `json:"y"` // yaw
-		Z float64 `json:"z"` // roll
-	} `json:"rotation,omitempty"`
-}
-
-// VSFMessage represents the VSF (Virtual Stream Format) JSON structure
-type VSFMessage struct {
-	Type        string             `json:"type"`
-	Time        float64            `json:"time"`
-	Blendshapes map[string]float64 `json:"blendshapes"`
-	Head        VSFHead            `json:"head"`
-}
-
-// VSFHead represents head tracking data in VSF format
-type VSFHead struct {
-	Yaw   float64 `json:"yaw"`
-	Pitch float64 `json:"pitch"`
-	Roll  float64 `json:"roll"`
-	X     float64 `json:"x,omitempty"`
-	Y     float64 `json:"y,omitempty"`
-	Z     float64 `json:"z,omitempty"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
+	Name string `json:"name"`
 }
 
 // Stats tracks relay statistics
@@ -73,7 +32,6 @@ type Stats struct {
 	PacketsReceived  int64
 	PacketsForwarded int64
 	PacketsDropped   int64
-	VSFConverted     int64
 	TotalLatencyNs   int64
 	PacketCount      int64
 }
@@ -104,39 +62,19 @@ func main() {
 	logInfo("iFacialMocap UDP Relay starting...")
 	logInfo(fmt.Sprintf("Listening on :%d", config.ListenPort))
 
-	// Resolve target addresses with format info
-	targetInfos := make([]TargetInfo, 0, len(config.Targets))
+	// Resolve target addresses
+	targetAddrs := make([]*net.UDPAddr, 0, len(config.Targets))
 	for _, target := range config.Targets {
 		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", target.Host, target.Port))
 		if err != nil {
 			logError(fmt.Sprintf("Failed to resolve target %s (%s:%d): %v", target.Name, target.Host, target.Port, err))
 			continue
 		}
-
-		format := target.Format
-		if format == "" {
-			format = "raw" // Default to raw forwarding
-		}
-
-		if format != "raw" && format != "vsf" {
-			logError(fmt.Sprintf("Invalid format '%s' for target %s, defaulting to 'raw'", format, target.Name))
-			format = "raw"
-		}
-
-		targetInfos = append(targetInfos, TargetInfo{
-			Addr:   addr,
-			Format: format,
-			Name:   target.Name,
-		})
-
-		formatInfo := ""
-		if format == "vsf" {
-			formatInfo = " (VSF format)"
-		}
-		logInfo(fmt.Sprintf("Forwarding to %s:%d (%s)%s", target.Host, target.Port, target.Name, formatInfo))
+		targetAddrs = append(targetAddrs, addr)
+		logInfo(fmt.Sprintf("Forwarding to %s:%d (%s)", target.Host, target.Port, target.Name))
 	}
 
-	if len(targetInfos) == 0 {
+	if len(targetAddrs) == 0 {
 		log.Fatalf("[ERROR] No valid targets configured")
 	}
 
@@ -151,6 +89,14 @@ func main() {
 		log.Fatalf("[ERROR] Failed to listen on port %d: %v", config.ListenPort, err)
 	}
 	defer conn.Close()
+
+	// Set socket options for better performance and compatibility
+	// Set buffer sizes to reduce packet loss
+	conn.SetReadBuffer(65536) // 64KB read buffer
+	conn.SetWriteBuffer(65536) // 64KB write buffer
+	if logLevel == "debug" {
+		logDebug("UDP socket buffers set to 64KB")
+	}
 
 	logInfo("Relay started successfully")
 
@@ -173,25 +119,29 @@ func main() {
 
 		if logLevel == "debug" {
 			logDebug(fmt.Sprintf("Received %d bytes from %s", n, srcAddr))
+			// Log first few bytes for debugging
+			if n > 0 && n < 100 {
+				logDebug(fmt.Sprintf("Packet preview: %s", string(buffer[:min(n, 50)])))
+			}
 		}
 
 		// Forward packet to all targets
 		start := time.Now()
 		packetData := buffer[:n]
-		successCount := forwardPacket(conn, packetData, targetInfos)
+		successCount := forwardPacket(conn, packetData, targetAddrs)
 
 		// Track latency
 		latency := time.Since(start).Nanoseconds()
 		atomic.AddInt64(&stats.TotalLatencyNs, latency)
 		atomic.AddInt64(&stats.PacketCount, 1)
 
-		if successCount == len(targetInfos) {
+		if successCount == len(targetAddrs) {
 			atomic.AddInt64(&stats.PacketsForwarded, 1)
 		} else {
-			dropped := int64(len(targetInfos) - successCount)
+			dropped := int64(len(targetAddrs) - successCount)
 			atomic.AddInt64(&stats.PacketsDropped, dropped)
 			if logLevel == "debug" || logLevel == "info" {
-				logInfo(fmt.Sprintf("Partially forwarded packet: %d/%d targets", successCount, len(targetInfos)))
+				logInfo(fmt.Sprintf("Partially forwarded packet: %d/%d targets", successCount, len(targetAddrs)))
 			}
 		}
 	}
@@ -212,81 +162,21 @@ func loadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
-// forwardPacket forwards data to all targets, converting to VSF format when needed
-func forwardPacket(conn *net.UDPConn, data []byte, targets []TargetInfo) int {
+func forwardPacket(conn *net.UDPConn, data []byte, targets []*net.UDPAddr) int {
 	successCount := 0
-	vsfData := make([]byte, 0) // Cache for VSF conversion
-
-	for _, target := range targets {
-		var sendData []byte
-		var err error
-
-		if target.Format == "vsf" {
-			// Convert to VSF format
-			vsfBytes, vsfErr := convertToVSF(data)
-			if vsfErr != nil {
-				logError(fmt.Sprintf("Failed to convert to VSF for %s: %v", target.Name, vsfErr))
-				continue
-			}
-			sendData = vsfBytes
-			atomic.AddInt64(&stats.VSFConverted, 1)
-		} else {
-			// Forward raw packet
-			sendData = data
-		}
-
-		_, err = conn.WriteToUDP(sendData, target.Addr)
+	// Forward to all targets in parallel to minimize latency
+	for _, targetAddr := range targets {
+		// Write immediately without copying data (Go's WriteToUDP handles this efficiently)
+		n, err := conn.WriteToUDP(data, targetAddr)
 		if err != nil {
-			logError(fmt.Sprintf("Failed to forward to %s (%s): %v", target.Name, target.Format, err))
+			logError(fmt.Sprintf("Failed to forward to %s: %v", targetAddr, err))
+		} else if n != len(data) {
+			logError(fmt.Sprintf("Partial write to %s: %d/%d bytes", targetAddr, n, len(data)))
 		} else {
 			successCount++
 		}
 	}
-
-	// Reuse vsfData buffer (keep for potential future reuse)
-	_ = vsfData
-
 	return successCount
-}
-
-// convertToVSF converts iFacialMocap JSON to VSF JSON format
-func convertToVSF(data []byte) ([]byte, error) {
-	// Parse iFacialMocap message
-	var ifmMsg iFacialMocapMessage
-	err := json.Unmarshal(data, &ifmMsg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse iFacialMocap JSON: %w", err)
-	}
-
-	// Create VSF message
-	vsfMsg := VSFMessage{
-		Type:        "vsf.blendshape",
-		Time:        float64(time.Now().UnixNano()) / 1e9, // Unix timestamp in seconds
-		Blendshapes: ifmMsg.BlendShapes,
-		Head: VSFHead{},
-	}
-
-	// Map rotation fields (iFacialMocap -> VSF)
-	if ifmMsg.Rotation != nil {
-		vsfMsg.Head.Yaw = ifmMsg.Rotation.Y   // rotation.y -> head.yaw
-		vsfMsg.Head.Pitch = ifmMsg.Rotation.X // rotation.x -> head.pitch
-		vsfMsg.Head.Roll = ifmMsg.Rotation.Z  // rotation.z -> head.roll
-	}
-
-	// Map head position if present
-	if ifmMsg.Head != nil {
-		vsfMsg.Head.X = ifmMsg.Head.X
-		vsfMsg.Head.Y = ifmMsg.Head.Y
-		vsfMsg.Head.Z = ifmMsg.Head.Z
-	}
-
-	// Marshal to JSON
-	vsfJSON, err := json.Marshal(vsfMsg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal VSF JSON: %w", err)
-	}
-
-	return vsfJSON, nil
 }
 
 func reportStats(interval int) {
@@ -297,7 +187,6 @@ func reportStats(interval int) {
 		received := atomic.LoadInt64(&stats.PacketsReceived)
 		forwarded := atomic.LoadInt64(&stats.PacketsForwarded)
 		dropped := atomic.LoadInt64(&stats.PacketsDropped)
-		vsfConverted := atomic.LoadInt64(&stats.VSFConverted)
 		totalLatency := atomic.LoadInt64(&stats.TotalLatencyNs)
 		packetCount := atomic.LoadInt64(&stats.PacketCount)
 
@@ -307,8 +196,8 @@ func reportStats(interval int) {
 		}
 
 		uptime := time.Since(startTime).Round(time.Second)
-		logInfo(fmt.Sprintf("[STATS] Uptime: %s | Received: %d | Forwarded: %d | Dropped: %d | VSF Converted: %d | Avg Latency: %.3f ms",
-			uptime, received, forwarded, dropped, vsfConverted, avgLatency))
+		logInfo(fmt.Sprintf("[STATS] Uptime: %s | Received: %d | Forwarded: %d | Dropped: %d | Avg Latency: %.3f ms",
+			uptime, received, forwarded, dropped, avgLatency))
 	}
 }
 
@@ -326,4 +215,11 @@ func logDebug(msg string) {
 
 func logError(msg string) {
 	log.Printf("[ERROR] %s", msg)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

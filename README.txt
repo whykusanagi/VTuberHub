@@ -7,9 +7,8 @@ This Go binary acts as a lightweight UDP relay that receives ARKit-style trackin
 data from the iFacialMocap iOS app and forwards it simultaneously to multiple 
 destinations (e.g., VTube Studio and Warudo) without introducing measurable latency.
 
-The relay supports two output formats:
-- RAW: Forwards original iFacialMocap JSON unchanged (for VTube Studio/VBridger)
-- VSF: Converts to Virtual Stream Format JSON (for Warudo/VSeeFace/VMC)
+The relay forwards packets byte-for-byte to all configured targets without modification.
+This enables splitting iFacialMocap's single UDP stream to multiple applications simultaneously.
 
 INSTALLATION & BUILD
 --------------------
@@ -28,9 +27,7 @@ USAGE
 -----
 1. Edit relay_config.json to match your setup:
    - listen_port: The port iFacialMocap sends to (default: 50000)
-   - targets: List of destinations (host, port, name, format)
-     * format: "raw" for original iFacialMocap JSON (default)
-     * format: "vsf" for VSF (Virtual Stream Format) JSON conversion
+   - targets: List of destinations (host, port, name)
    - buffer_size: Buffer size in bytes (default: 4096)
    - log_level: debug, info, or error
    - stats_interval: Seconds between statistics reports
@@ -41,6 +38,7 @@ USAGE
 3. Configure iFacialMocap iOS app:
    - Set your PC's IP address
    - Set port to 50000 (or your configured listen_port)
+   - IMPORTANT: After starting the relay, restart iFacialMocap to establish connection
 
 4. Verify both VTube Studio and Warudo receive tracking data simultaneously.
 
@@ -49,17 +47,18 @@ VERIFICATION
 When started correctly, you should see:
   [INFO] Listening on :50000
   [INFO] Forwarding to 127.0.0.1:49983 (VTubeStudio)
-  [INFO] Forwarding to 127.0.0.1:39539 (Warudo) (VSF format)
+  [INFO] Forwarding to 127.0.0.1:39539 (Warudo)
   [INFO] Relay started successfully
 
 Every 10 seconds (default), statistics will be printed:
-  [STATS] Uptime: 1m30s | Received: 450 | Forwarded: 900 | Dropped: 0 | VSF Converted: 450 | Avg Latency: 0.123 ms
+  [STATS] Uptime: 1m30s | Received: 450 | Forwarded: 900 | Dropped: 0 | Avg Latency: 0.123 ms
 
 TROUBLESHOOTING
 ---------------
-Symptom: No packets arriving
-  Cause: Wrong port or Windows Firewall blocking UDP
+Symptom: No packets arriving or blendshapes not working
+  Cause: iFacialMocap needs to be restarted after relay starts, or wrong port/firewall
   Fix: 
+    - RESTART iFacialMocap after starting the relay (it needs to reconnect)
     - Verify iFacialMocap target IP/port matches relay listen_port
     - Add firewall exception for UDP port 50000 (inbound)
     - Check Windows Defender Firewall settings
@@ -129,29 +128,19 @@ EXAMPLE CONFIGURATION
 {
   "listen_port": 50000,
   "targets": [
-    {"host": "127.0.0.1", "port": 49983, "name": "VTubeStudio", "format": "raw"},
-    {"host": "127.0.0.1", "port": 39539, "name": "Warudo", "format": "vsf"}
+    {"host": "127.0.0.1", "port": 49983, "name": "VTubeStudio"},
+    {"host": "127.0.0.1", "port": 39539, "name": "Warudo"}
   ],
   "buffer_size": 4096,
   "log_level": "info",
   "stats_interval": 10
 }
 
-VSF FORMAT CONVERSION
----------------------
-The relay automatically converts iFacialMocap JSON to VSF (Virtual Stream Format) 
-when format: "vsf" is specified for a target. This enables full ARKit blendshape 
-and head tracking support in Warudo, VSeeFace, and Virtual Motion Capture.
-
-Conversion mapping:
-- blendShapes → blendshapes (copied directly)
-- rotation.x → head.pitch
-- rotation.y → head.yaw  
-- rotation.z → head.roll
-- head.x/y/z → head.x/y/z (copied directly)
-- Adds type: "vsf.blendshape" and current timestamp
-
-Targets without "format" specified default to "raw" forwarding.
+NOTES
+-----
+- The relay forwards packets exactly as received (no format conversion)
+- Both Warudo and VTube Studio support iFacialMocap's native format directly
+- Each target receives an identical copy of every packet
 
 SUPPORT
 -------
@@ -161,5 +150,5 @@ For issues, check:
 3. Verify network connectivity between iOS device and PC
 4. Ensure target applications are running and listening
 
-Version: 1.1 (with VSF conversion support)
+Version: 2.0 (Simple traffic splitter)
 Build: Go 1.21+

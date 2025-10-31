@@ -1,8 +1,8 @@
 {
   "listen_port": 50000,
   "targets": [
-    {"host": "127.0.0.1", "port": 49983, "name": "VTubeStudio", "format": "raw"},
-    {"host": "127.0.0.1", "port": 39539, "name": "Warudo", "format": "vsf"}
+    {"host": "127.0.0.1", "port": 49983, "name": "VTubeStudio"},
+    {"host": "127.0.0.1", "port": 39539, "name": "Warudo"}
   ],
   "buffer_size": 4096,
   "log_level": "info",
