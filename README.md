@@ -571,13 +571,15 @@ For issues, check:
 
 Copyright (c) 2025 whyKusanagi
 
-This project is licensed under the MIT License with Non-Commercial Use Only restrictions.
+This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 **Key Points:**
 - ✅ Free to use, modify, and distribute for **non-commercial purposes**
-- ✅ Provided "AS IS" with **no warranty or liability**
-- ❌ **Commercial use is prohibited** (contact for commercial licensing)
+- ✅ Must provide **attribution** (credit the original author)
+- ✅ Modified works must use the **same license** (ShareAlike)
+- ❌ **Commercial use is prohibited**
+- ⚠️ **No warranty or liability** - software provided "AS IS"
 - 📄 See [LICENSE](LICENSE) file for full terms
 
-**Summary**: Use this software freely for personal or educational purposes. Do not use it in commercial products or services without explicit permission from the copyright holder.
+**Summary**: Use this software freely for personal, educational, or other non-commercial purposes. Commercial use requires separate licensing. Always provide attribution when sharing or modifying.
 
