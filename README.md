@@ -15,7 +15,7 @@ graph TB
     end
     
     subgraph "PC/Laptop"
-        B[UDP Relay<br/>Port 50000]
+        B[UDP Relay<br/>Port 13121]
         C[VBridger<br/>Port 49983]
         D[VTube Studio]
         E[Warudo<br/>Port 39539]
@@ -43,7 +43,7 @@ sequenceDiagram
     participant VTS as VTube Studio
     participant Warudo as Warudo
     
-    Note over Relay: Listening on port 50000
+    Note over Relay: Listening on port 13121
     
     loop Every Frame (~30-60 FPS)
         iOS->>Relay: UDP Packet (ARKit data)
@@ -130,7 +130,7 @@ Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directo
    Edit `relay_config.json` to match your setup:
    ```json
    {
-     "listen_port": 50000,
+     "listen_port": 13121,
      "targets": [
        {"host": "127.0.0.1", "port": 49983, "name": "VBridger"},
        {"host": "127.0.0.1", "port": 39539, "name": "Warudo"}
@@ -140,6 +140,8 @@ Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directo
      "stats_interval": 10
    }
    ```
+   
+   **Note**: Port `13121` is a custom port chosen to avoid conflicts with common software. It maps to Celeste themes/motifs and should not interfere with well-known services.
 
 2. **Start the Relay**
    
@@ -149,10 +151,37 @@ Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directo
 
 3. **Configure iFacialMocap iOS App**
    - Set your PC's IP address
-   - Set port to `50000` (or your configured `listen_port`)
+   - Set port to `13121` (or your configured `listen_port`)
    - **IMPORTANT**: After starting the relay, restart iFacialMocap to establish connection
 
-4. **Verify**
+4. **Configure Windows Firewall** (Windows only)
+   
+   Windows Defender Firewall will likely block incoming UDP traffic. You need to allow the relay:
+   
+   **Option A: Allow via Windows Defender Firewall GUI**
+   1. Open Windows Defender Firewall: `Win + R`, type `wf.msc`, press Enter
+   2. Click "Inbound Rules" → "New Rule..."
+   3. Select "Port" → Next
+   4. Select "UDP" and enter port `13121` → Next
+   5. Select "Allow the connection" → Next
+   6. Check all profiles (Domain, Private, Public) → Next
+   7. Name it "iFacialMocap UDP Relay" → Finish
+   
+   **Option B: Allow via PowerShell (Run as Administrator)**
+   ```powershell
+   New-NetFirewallRule -DisplayName "iFacialMocap UDP Relay" -Direction Inbound -Protocol UDP -LocalPort 13121 -Action Allow
+   ```
+   
+   **Option C: Allow the executable directly**
+   1. Open Windows Defender Firewall: `Win + R`, type `wf.msc`, press Enter
+   2. Click "Inbound Rules" → "New Rule..."
+   3. Select "Program" → Next
+   4. Browse to `ifmrelay.exe` → Next
+   5. Select "Allow the connection" → Next
+   6. Check all profiles → Next
+   7. Name it "iFacialMocap UDP Relay" → Finish
+
+5. **Verify**
    
    VBridger (which forwards to VTube Studio) and Warudo should receive tracking data simultaneously.
 
@@ -161,7 +190,7 @@ Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directo
 When started correctly, you should see:
 
 ```
-[INFO] Listening on :50000
+[INFO] Listening on :13121
 [INFO] Forwarding to 127.0.0.1:49983 (VBridger)
 [INFO] Forwarding to 127.0.0.1:39539 (Warudo)
 [INFO] Relay started successfully
@@ -177,7 +206,7 @@ Every 10 seconds (default), statistics will be printed:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `listen_port` | int | 50000 | UDP port to listen for iFacialMocap data |
+| `listen_port` | int | 13121 | UDP port to listen for iFacialMocap data (custom port, Celeste-themed, avoids conflicts) |
 | `targets` | array | required | List of forwarding destinations |
 | `buffer_size` | int | 4096 | Buffer size in bytes for packet handling |
 | `log_level` | string | "info" | Logging level: `debug`, `info`, or `error` |
@@ -198,9 +227,10 @@ Each target requires:
 
 **Fix**:
 - **RESTART iFacialMocap** after starting the relay (it needs to reconnect)
-- Verify iFacialMocap target IP/port matches relay `listen_port`
-- Add firewall exception for UDP port 50000 (inbound)
+- Verify iFacialMocap target IP/port matches relay `listen_port` (default: 13121)
+- **Windows Firewall**: Add firewall exception for UDP port 13121 (inbound) - see "Windows Firewall Configuration" section below
 - Check Windows Defender Firewall settings
+- Verify the relay is actually listening: Use `netstat -an | findstr :13121` to confirm
 
 ### Symptom: Only one app updates
 
@@ -228,6 +258,91 @@ Each target requires:
 - Use wired Ethernet connection (avoid WiFi)
 - Increase `buffer_size` in config if using custom payloads
 - Ensure relay has adequate system resources
+
+## Windows Firewall Configuration
+
+Windows Defender Firewall will block incoming UDP connections by default. You **must** configure a firewall rule to allow the relay to receive packets from your iOS device.
+
+### Port Configuration
+
+- **Default Listen Port**: `13121` (UDP)
+- **Port Selection**: Custom port chosen to avoid conflicts with well-known software
+- **Protocol**: UDP (inbound)
+
+### Quick Setup (PowerShell - Run as Administrator)
+
+```powershell
+# Allow UDP port 13121 inbound
+New-NetFirewallRule -DisplayName "iFacialMocap UDP Relay" -Direction Inbound -Protocol UDP -LocalPort 13121 -Action Allow -Profile Any
+```
+
+### Manual Setup via GUI
+
+1. Press `Win + R`, type `wf.msc`, press Enter
+2. In Windows Defender Firewall, click **"Inbound Rules"** in the left pane
+3. Click **"New Rule..."** in the right pane
+4. Select **"Port"** → Click Next
+5. Select **"UDP"** and enter **`13121`** → Click Next
+6. Select **"Allow the connection"** → Click Next
+7. Check all profiles (**Domain**, **Private**, **Public**) → Click Next
+8. Name it **"iFacialMocap UDP Relay"** → Click Finish
+
+### Verify Firewall Rule
+
+```powershell
+# Check if rule exists
+Get-NetFirewallRule -DisplayName "iFacialMocap UDP Relay"
+
+# Check firewall rules for port 13121
+netsh advfirewall firewall show rule name=all | findstr "13121"
+```
+
+### Alternative: Allow Executable Directly
+
+If you prefer to allow the executable instead of the port:
+
+1. Press `Win + R`, type `wf.msc`, press Enter
+2. Click **"Inbound Rules"** → **"New Rule..."**
+3. Select **"Program"** → Click Next
+4. Browse to your `ifmrelay.exe` → Click Next
+5. Select **"Allow the connection"** → Click Next
+6. Check all profiles → Click Next
+7. Name it **"iFacialMocap UDP Relay"** → Click Finish
+
+### Testing Firewall Configuration
+
+After configuring the firewall:
+
+```powershell
+# Test if port is listening (should show UDP :13121)
+netstat -an | findstr :13121
+
+# Test connectivity from another device (if available)
+# Replace 192.168.1.100 with your PC's IP address
+Test-NetConnection -ComputerName 192.168.1.100 -Port 13121 -Udp
+```
+
+### Troubleshooting Firewall Issues
+
+**Symptom**: No packets received, relay shows no activity
+
+**Diagnosis**:
+1. Check if firewall rule exists and is enabled
+2. Verify rule allows UDP protocol (not TCP)
+3. Ensure rule applies to the correct network profile (Private/Public)
+4. Check if another firewall/antivirus is blocking
+
+**Commands**:
+```powershell
+# View all firewall rules for this relay
+Get-NetFirewallRule -DisplayName "*iFacialMocap*" | Get-NetFirewallPortFilter
+
+# Check if Windows Defender Firewall is enabled
+Get-NetFirewallProfile | Select-Object Name, Enabled
+
+# Temporarily disable firewall for testing (NOT RECOMMENDED FOR PRODUCTION)
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+```
 
 ## Performance Targets
 
@@ -287,17 +402,17 @@ sudo systemctl start ifmrelay
 
 ```bash
 # Send a test packet
-echo "test" | nc -u 127.0.0.1 50000
+echo "test" | nc -u 127.0.0.1 13121
 ```
 
 ### Throughput Stress Test
 
 ```bash
 # Windows PowerShell
-1..10000 | ForEach-Object { echo $_ | nc -u 127.0.0.1 50000 }
+1..10000 | ForEach-Object { echo $_ | nc -u 127.0.0.1 13121 }
 
 # Linux/macOS
-for i in {1..10000}; do echo $i | nc -u 127.0.0.1 50000; done
+for i in {1..10000}; do echo $i | nc -u 127.0.0.1 13121; done
 ```
 
 ### Monitor Performance
@@ -330,11 +445,13 @@ for i in {1..10000}; do echo $i | nc -u 127.0.0.1 50000; done
 
 ## Notes
 
+- **Port Selection**: The default port `13121` is a custom port chosen to avoid conflicts with common software. It maps to Celeste themes/motifs and should not interfere with well-known services or applications.
 - The relay forwards packets exactly as received (no format conversion)
 - VBridger forwards data to VTube Studio (VBridger acts as a bridge between the relay and VTube Studio)
 - Warudo receives data directly from the relay
 - Each target receives an identical copy of every packet
 - No packet transformation or protocol translation occurs
+- **Windows Users**: Don't forget to configure Windows Firewall to allow UDP port 13121 (inbound) - see the "Windows Firewall Configuration" section
 
 ## Version
 

@@ -1,7 +1,7 @@
 {
-  "listen_port": 50000,
+  "listen_port": 13121,
   "targets": [
-    {"host": "127.0.0.1", "port": 49983, "name": "VTubeStudio"},
+    {"host": "127.0.0.1", "port": 49983, "name": "VBridger"},
     {"host": "127.0.0.1", "port": 39539, "name": "Warudo"}
   ],
   "buffer_size": 4096,
