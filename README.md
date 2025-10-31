@@ -569,5 +569,15 @@ For issues, check:
 
 ## License
 
-[Your License Here]
+Copyright (c) 2025 whyKusanagi
+
+This project is licensed under the MIT License with Non-Commercial Use Only restrictions.
+
+**Key Points:**
+- ✅ Free to use, modify, and distribute for **non-commercial purposes**
+- ✅ Provided "AS IS" with **no warranty or liability**
+- ❌ **Commercial use is prohibited** (contact for commercial licensing)
+- 📄 See [LICENSE](LICENSE) file for full terms
+
+**Summary**: Use this software freely for personal or educational purposes. Do not use it in commercial products or services without explicit permission from the copyright holder.
 
