@@ -17,3 +17,7 @@ ifmrelay.exe
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+raw_packets.log
+*.log
