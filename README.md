@@ -101,27 +101,85 @@ leftEye#1.4462843,-0.30282283,-0.123135895|
 
 ## Installation & Build
 
+This relay is primarily designed for Windows. It can also be built on macOS/Linux for experimental purposes.
+
 ### Prerequisites
 
-- Go 1.22 or later
-  - Windows: `winget install GoLang.Go`
-  - macOS: `brew install go`
-  - Linux: Use your distribution's package manager
+Install Go 1.22 or later:
 
-### Build
+#### Windows (Primary Platform)
+
+**Option 1: Using winget (Recommended)**
+```cmd
+winget install GoLang.Go
+```
+
+**Option 2: Manual Installation**
+1. Download Go from https://go.dev/dl/
+2. Run the installer (.msi file)
+3. The installer will add Go to your PATH automatically
+4. Verify installation: Open a new Command Prompt or PowerShell and run:
+   ```cmd
+   go version
+   ```
+
+**Option 3: Using Chocolatey**
+```cmd
+choco install golang
+```
+
+#### macOS (Experimental/Development)
 
 ```bash
+brew install go
+```
+
+**Note**: While the relay can be built on macOS, it's primarily designed and tested for Windows. Use macOS for development/experimentation purposes.
+
+#### Linux (Experimental/Development)
+
+Use your distribution's package manager:
+```bash
+# Debian/Ubuntu
+sudo apt-get install golang-go
+
+# Fedora/RHEL
+sudo dnf install golang
+
+# Arch Linux
+sudo pacman -S go
+```
+
+### Build Instructions
+
+#### Windows Build
+
+```cmd
 # Standard build
 go build -ldflags "-s -w" -o ifmrelay.exe main.go
 
-# Smallest binary size
+# Smallest binary size (recommended)
 go build -ldflags "-s -w" -trimpath -o ifmrelay.exe main.go
-
-# macOS/Linux
-go build -ldflags "-s -w" -o ifmrelay main.go
 ```
 
-Place `ifmrelay` (or `ifmrelay.exe`) and `relay_config.json` in the same directory.
+**Build Flags Explained:**
+- `-ldflags "-s -w"`: Strips debug symbols and reduces binary size
+- `-trimpath`: Removes file system paths from the compiled binary
+- `-o ifmrelay.exe`: Output filename
+
+#### macOS/Linux Build (Experimental)
+
+```bash
+# Standard build
+go build -ldflags "-s -w" -o ifmrelay main.go
+
+# Smallest binary size
+go build -ldflags "-s -w" -trimpath -o ifmrelay main.go
+```
+
+### Post-Build Setup
+
+Place the compiled binary (`ifmrelay.exe` on Windows, `ifmrelay` on macOS/Linux) and `relay_config.json` in the same directory.
 
 ## Usage
 
@@ -400,26 +458,48 @@ sudo systemctl start ifmrelay
 
 ### Basic Test
 
+**Windows (Command Prompt or PowerShell):**
+```cmd
+# Send a test packet
+echo test | nc -u 127.0.0.1 13121
+```
+
+**macOS/Linux:**
 ```bash
 # Send a test packet
 echo "test" | nc -u 127.0.0.1 13121
 ```
 
+**Note**: On Windows, you may need to install a tool like `ncat` (from Nmap) or use PowerShell's `Test-NetConnection` for UDP testing. Alternatively, use iFacialMocap itself to test.
+
 ### Throughput Stress Test
 
-```bash
-# Windows PowerShell
+**Windows PowerShell:**
+```powershell
 1..10000 | ForEach-Object { echo $_ | nc -u 127.0.0.1 13121 }
+```
 
-# Linux/macOS
+**Windows Command Prompt (batch):**
+```cmd
+for /L %i in (1,1,10000) do @echo %i | nc -u 127.0.0.1 13121
+```
+
+**macOS/Linux:**
+```bash
 for i in {1..10000}; do echo $i | nc -u 127.0.0.1 13121; done
 ```
 
 ### Monitor Performance
 
-- **Task Manager** (CPU/Memory)
-- **Resource Monitor** (Network activity)
-- **Relay statistics** (periodic reports)
+**Windows:**
+- **Task Manager** (CPU/Memory usage)
+- **Resource Monitor** (Network activity, view with `resmon.exe`)
+- **Relay statistics** (periodic reports in console)
+
+**macOS/Linux:**
+- `top` or `htop` for CPU/Memory
+- `netstat` or `ss` for network activity
+- **Relay statistics** (periodic reports in console)
 
 ## Log Levels
 
