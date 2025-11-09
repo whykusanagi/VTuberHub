@@ -21,3 +21,7 @@ Thumbs.db
 # Logs
 raw_packets.log
 *.log
+
+# Media files
+*.png
+*.mkv

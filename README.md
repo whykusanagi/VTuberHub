@@ -1,4 +1,6 @@
-# iFacialMocap UDP Relay
+# VTuberHub
+
+**One stream in, many clients out.**
 
 A lightweight Go-based UDP relay that receives ARKit-style facial tracking data from the iFacialMocap iOS app and forwards it simultaneously to multiple destinations (VBridger for VTube Studio, Warudo, etc.) without introducing measurable latency.
 
