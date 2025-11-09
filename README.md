@@ -563,7 +563,7 @@ for i in {1..10000}; do echo $i | nc -u 127.0.0.1 13121; done
 
 - **Version**: 2.0 (Simple traffic splitter)
 - **Build**: Go 1.21+
-- **License**: (Check your project's license file)
+- **License**: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International - See [LICENSE](LICENSE) file for details
 
 ## Support
 
