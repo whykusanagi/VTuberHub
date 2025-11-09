@@ -6,6 +6,10 @@ A lightweight Go-based UDP relay that receives ARKit-style facial tracking data 
 
 The relay forwards packets byte-for-byte to all configured targets without modification. This enables splitting iFacialMocap's single UDP stream to multiple applications simultaneously, allowing you to use the same facial tracking data in multiple programs at once.
 
+### Demo
+
+![Demo showing two models being used simultaneously](demo.gif)
+
 ## Architecture
 
 ```mermaid
