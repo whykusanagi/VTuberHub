@@ -31,6 +31,7 @@ Thumbs.db
 
 # Logs
 raw_packets.log
+raw_packets/
 *.log
 
 # Media files

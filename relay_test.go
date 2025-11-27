@@ -17,14 +17,18 @@ func TestConfigNormalize(t *testing.T) {
 	}
 
 	cfg = &Config{
-		ListenPort: 13121,
-		Targets:    []Target{{Host: "127.0.0.1", Port: 49983}},
+		ListenPort:  13121,
+		Targets:     []Target{{Host: "127.0.0.1", Port: 49983}},
+		DumpPackets: true,
 	}
 	if err := cfg.normalize(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if cfg.BufferSize != 4096 || cfg.StatsInterval != 10 || cfg.LogLevel != "info" {
 		t.Fatalf("expected defaults to be populated: %+v", cfg)
+	}
+	if cfg.DumpDir == "" {
+		t.Fatalf("expected dump dir default when dump enabled")
 	}
 }
 
@@ -35,6 +39,8 @@ func TestLoadConfig(t *testing.T) {
 		"listen_port": 13121,
 		"buffer_size": 2048,
 		"log_level": "debug",
+		"dump_packets": true,
+		"dump_dir": "custom_raw",
 		"targets": [{"host":"127.0.0.1","port":1234,"name":"Test"}]
 	}`)
 	if err := os.WriteFile(path, content, 0o644); err != nil {
@@ -48,7 +54,7 @@ func TestLoadConfig(t *testing.T) {
 	if err := cfg.normalize(); err != nil {
 		t.Fatalf("normalize failed: %v", err)
 	}
-	if cfg.BufferSize != 2048 || cfg.LogLevel != "debug" {
+	if cfg.BufferSize != 2048 || cfg.LogLevel != "debug" || cfg.DumpDir != "custom_raw" {
 		t.Fatalf("config fields not preserved: %+v", cfg)
 	}
 }
@@ -74,5 +80,31 @@ func TestForwardPacket(t *testing.T) {
 	failCount := forwardPacket(&fakeWriter{fail: true}, []byte("hello"), []*net.UDPAddr{target})
 	if failCount != 0 {
 		t.Fatalf("expected 0 success for failing writer")
+	}
+}
+
+func TestPacketDumper(t *testing.T) {
+	dir := t.TempDir()
+	d, err := newPacketDumper(dir)
+	if err != nil {
+		t.Fatalf("newPacketDumper failed: %v", err)
+	}
+	payload := []byte("trackingStatus&1|eyeBlink_L&21|...")
+	if err := d.Write(payload); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("failed to read dump dir: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("expected 1 dump file, got %d", len(files))
+	}
+	data, err := os.ReadFile(filepath.Join(dir, files[0].Name()))
+	if err != nil {
+		t.Fatalf("failed to read dump file: %v", err)
+	}
+	if string(data) != string(payload) {
+		t.Fatalf("dump content mismatch")
 	}
 }

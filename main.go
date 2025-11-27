@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 )
@@ -19,6 +20,8 @@ type Config struct {
 	BufferSize    int      `json:"buffer_size"`
 	LogLevel      string   `json:"log_level"`
 	StatsInterval int      `json:"stats_interval"`
+	DumpPackets   bool     `json:"dump_packets"`
+	DumpDir       string   `json:"dump_dir"`
 }
 
 // Target represents a forwarding destination
@@ -45,6 +48,8 @@ var (
 
 func main() {
 	configPath := flag.String("config", "relay_config.json", "Path to configuration file")
+	dumpDirFlag := flag.String("dump-dir", "", "Directory to store raw packet dumps")
+	dumpEnableFlag := flag.Bool("dump-packets", false, "Enable raw packet dumping")
 	flag.Parse()
 
 	config, err := loadConfig(*configPath)
@@ -52,10 +57,27 @@ func main() {
 		log.Fatalf("[ERROR] Failed to load config: %v", err)
 	}
 
+	if *dumpDirFlag != "" {
+		config.DumpDir = *dumpDirFlag
+	}
+	if *dumpEnableFlag {
+		config.DumpPackets = true
+	}
+
 	if err := config.normalize(); err != nil {
 		log.Fatalf("[ERROR] %v", err)
 	}
 	logLevel = config.LogLevel
+
+	var dumper *packetDumper
+	if config.DumpPackets {
+		pd, err := newPacketDumper(config.DumpDir)
+		if err != nil {
+			log.Fatalf("[ERROR] Failed to initialize packet dumper: %v", err)
+		}
+		dumper = pd
+		logInfo(fmt.Sprintf("Packet dumping enabled at %s", config.DumpDir))
+	}
 
 	logInfo("iFacialMocap UDP Relay starting...")
 	logInfo(fmt.Sprintf("Listening on :%d", config.ListenPort))
@@ -123,9 +145,16 @@ func main() {
 			}
 		}
 
+		packetData := buffer[:n]
+
+		if dumper != nil {
+			if err := dumper.Write(packetData); err != nil {
+				logError(fmt.Sprintf("Failed to dump packet: %v", err))
+			}
+		}
+
 		// Forward packet to all targets
 		start := time.Now()
-		packetData := buffer[:n]
 		successCount := forwardPacket(conn, packetData, targetAddrs)
 
 		// Track latency
@@ -176,6 +205,9 @@ func (c *Config) normalize() error {
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
 	}
+	if c.DumpPackets && c.DumpDir == "" {
+		c.DumpDir = "raw_packets"
+	}
 	return nil
 }
 
@@ -197,6 +229,26 @@ func forwardPacket(conn udpWriter, data []byte, targets []*net.UDPAddr) int {
 		}
 	}
 	return successCount
+}
+
+type packetDumper struct {
+	dir     string
+	counter uint64
+}
+
+func newPacketDumper(dir string) (*packetDumper, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	return &packetDumper{dir: dir}, nil
+}
+
+func (d *packetDumper) Write(data []byte) error {
+	idx := atomic.AddUint64(&d.counter, 1)
+	ts := time.Now().Format("20060102-150405")
+	filename := fmt.Sprintf("packet-%s-%d.txt", ts, idx)
+	path := filepath.Join(d.dir, filename)
+	return os.WriteFile(path, data, 0o644)
 }
 
 func reportStats(interval int) {

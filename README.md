@@ -564,6 +564,30 @@ for i in {1..10000}; do echo $i | nc -u 127.0.0.1 13121; done
 - Each target receives an identical copy of every packet
 - No packet transformation or protocol translation occurs
 - **Windows Users**: Don't forget to configure Windows Firewall to allow UDP port 13121 (inbound) - see the "Windows Firewall Configuration" section
+- **Packet replay tooling**: Enable dumping (see below) if you plan to archive raw blendshape streams or build a replay bot.
+
+### Packet Dumping & Replay
+
+Set `dump_packets` to `true` in `relay_config.json` (or launch with `--dump-packets`) to write every raw, pipe-delimited payload into timestamped files under `raw_packets/` (default) or your custom `dump_dir`. Example:
+
+```json
+{
+  "listen_port": 13121,
+  "dump_packets": true,
+  "dump_dir": "raw_packets",
+  "targets": [
+    {"host": "127.0.0.1", "port": 49983, "name": "VBridger"}
+  ]
+}
+```
+
+CLI overrides:
+
+```bash
+./ifmrelay -config relay_config.json --dump-packets --dump-dir=/tmp/raw_packets
+```
+
+Each file contains the exact UDP payload (UTF-8 text) so you can inspect blendshape sequences or feed them into a replay engine later.
 
 ## Latest Validation Evidence
 
