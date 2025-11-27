@@ -2,7 +2,13 @@
 
 **One stream in, many clients out.**
 
+[![GitHub](https://img.shields.io/badge/GitHub-whykusanagi-blue)](https://github.com/whykusanagi/VTuberHub)
+[![License](https://img.shields.io/badge/License-CC--BY--NC--SA--4.0-orange)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8)](https://go.dev/)
+
 A lightweight Go-based UDP relay that receives ARKit-style facial tracking data from the iFacialMocap iOS app and forwards it simultaneously to multiple destinations (VBridger for VTube Studio, Warudo, etc.) without introducing measurable latency.
+
+**Perfect for VTubers who want to use the same facial tracking data in multiple applications simultaneously.**
 
 ## Overview
 
@@ -558,6 +564,22 @@ for i in {1..10000}; do echo $i | nc -u 127.0.0.1 13121; done
 - Each target receives an identical copy of every packet
 - No packet transformation or protocol translation occurs
 - **Windows Users**: Don't forget to configure Windows Firewall to allow UDP port 13121 (inbound) - see the "Windows Firewall Configuration" section
+
+## Latest Validation Evidence
+
+- **Date:** 2025-01-26
+- **Environment:** macOS (Go 1.22.3)
+- **Commands:**
+
+```text
+$ go test ./...
+?   	ifmrelay	[no test files]
+
+$ go build ./...
+# (no output, build succeeded)
+```
+
+This confirms the relay compiles cleanly on macOS. Windows builders should repeat the same commands (and capture `go build` output) before tagging a release.
 
 ## Version
 

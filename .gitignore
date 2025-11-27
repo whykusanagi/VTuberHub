@@ -13,6 +13,17 @@ ifmrelay.exe
 *.swp
 *.swo
 *~
+.Spotlight-V100
+.Trashes
+._*
+.AppleDouble
+.env
+.env.*
+.secrets/
+*.key
+docker-compose.override.yml
+*.coverage
+.pytest_cache/
 
 # OS
 .DS_Store
