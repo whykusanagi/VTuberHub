@@ -27,13 +27,13 @@ graph TB
     end
     
     subgraph "PC/Laptop"
-        B[UDP Relay<br/>Port 13121]
-        C[VBridger<br/>Port 49983]
+        B["UDP Relay (Port 13121)"]
+        C["VBridger (Port 49983)"]
         D[VTube Studio]
-        E[Warudo<br/>Port 39539]
+        E["Warudo (Port 39539)"]
     end
     
-    A -->|UDP Packets<br/>ARKit Blendshapes| B
+    A -->|"UDP Packets (ARKit Blendshapes)"| B
     B -->|Identical Copy| C
     C -->|Forwarded| D
     B -->|Identical Copy| E
@@ -71,7 +71,7 @@ sequenceDiagram
         Relay->>Relay: Update Statistics
     end
     
-    Note over Relay: Periodic Stats Report<br/>(Every 10 seconds)
+    Note over Relay: Periodic Stats Report (Every 10 seconds)
 ```
 
 ## Data Format
