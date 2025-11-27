@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -51,13 +52,10 @@ func main() {
 		log.Fatalf("[ERROR] Failed to load config: %v", err)
 	}
 
+	if err := config.normalize(); err != nil {
+		log.Fatalf("[ERROR] %v", err)
+	}
 	logLevel = config.LogLevel
-	if config.BufferSize == 0 {
-		config.BufferSize = 4096
-	}
-	if config.StatsInterval == 0 {
-		config.StatsInterval = 10
-	}
 
 	logInfo("iFacialMocap UDP Relay starting...")
 	logInfo(fmt.Sprintf("Listening on :%d", config.ListenPort))
@@ -92,7 +90,7 @@ func main() {
 
 	// Set socket options for better performance and compatibility
 	// Set buffer sizes to reduce packet loss
-	conn.SetReadBuffer(65536) // 64KB read buffer
+	conn.SetReadBuffer(65536)  // 64KB read buffer
 	conn.SetWriteBuffer(65536) // 64KB write buffer
 	if logLevel == "debug" {
 		logDebug("UDP socket buffers set to 64KB")
@@ -162,11 +160,33 @@ func loadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
-func forwardPacket(conn *net.UDPConn, data []byte, targets []*net.UDPAddr) int {
+func (c *Config) normalize() error {
+	if c.ListenPort <= 0 {
+		return errors.New("listen_port must be > 0")
+	}
+	if len(c.Targets) == 0 {
+		return errors.New("at least one target is required")
+	}
+	if c.BufferSize <= 0 {
+		c.BufferSize = 4096
+	}
+	if c.StatsInterval <= 0 {
+		c.StatsInterval = 10
+	}
+	if c.LogLevel == "" {
+		c.LogLevel = "info"
+	}
+	return nil
+}
+
+type udpWriter interface {
+	WriteToUDP(b []byte, addr *net.UDPAddr) (int, error)
+}
+
+func forwardPacket(conn udpWriter, data []byte, targets []*net.UDPAddr) int {
 	successCount := 0
-	// Forward to all targets in parallel to minimize latency
+	// Forward sequentially; UDP writes are non-blocking and this keeps the implementation simple.
 	for _, targetAddr := range targets {
-		// Write immediately without copying data (Go's WriteToUDP handles this efficiently)
 		n, err := conn.WriteToUDP(data, targetAddr)
 		if err != nil {
 			logError(fmt.Sprintf("Failed to forward to %s: %v", targetAddr, err))

@@ -573,7 +573,7 @@ for i in {1..10000}; do echo $i | nc -u 127.0.0.1 13121; done
 
 ```text
 $ go test ./...
-?   	ifmrelay	[no test files]
+ok  	ifmrelay	0.47s
 
 $ go build ./...
 # (no output, build succeeded)
